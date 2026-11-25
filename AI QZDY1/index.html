@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI事前プロンプト生成ツール - 枠を節約し、最初から賢く動かす</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      background: #f8fafc; color: #1e293b; line-height: 1.65;
+      padding: 40px 20px;
+    }
+    .container { max-width: 760px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 32px; }
+    h1 { font-size: 26px; margin-bottom: 10px; color: #0f172a; }
+    .subtitle { color: #64748b; font-size: 15px; }
+
+    .steps {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-bottom: 28px;
+    }
+    .step-card {
+      background: #fff; padding: 14px; border-radius: 10px;
+      border: 1px solid #e2e8f0; font-size: 13px;
+    }
+    .step-card strong { display: block; color: #2563eb; margin-bottom: 4px; }
+
+    .card {
+      background: #fff; padding: 24px; border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
+    }
+    label { display: block; font-weight: 600; margin-bottom: 8px; }
+    textarea {
+      width: 100%; height: 110px; padding: 12px; border: 1px solid #cbd5e1;
+      border-radius: 8px; font-size: 15px; resize: vertical;
+    }
+    textarea:focus { outline: none; border-color: #2563eb; }
+
+    .presets { margin: 10px 0 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .preset-btn {
+      background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 6px;
+      font-size: 12px; color: #475569; cursor: pointer;
+    }
+    .preset-btn:hover { background: #e2e8f0; }
+
+    .primary-btn {
+      width: 100%; padding: 12px; background: #2563eb; color: #fff;
+      border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .primary-btn:hover { background: #1d4ed8; }
+    .primary-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .output-box { margin-top: 24px; display: none; }
+    .output-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .copy-btn {
+      background: #10b981; color: #fff; border: none; padding: 6px 14px;
+      border-radius: 6px; font-size: 13px; cursor: pointer;
+    }
+    pre {
+      background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 8px;
+      white-space: pre-wrap; word-wrap: break-word; font-size: 14px;
+    }
+    @media (max-width: 600px) { .steps { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AI事前設定ジェネレーター</h1>
+      <p class="subtitle">有料プラン未加入でも大丈夫。前提プロンプトで無駄なやり取りを減らし、無料枠を節約しながらAIを最初から的確に動かします。</p>
+    </header>
+
+    <div class="steps">
+      <div class="step-card">
+        <strong>1. やりたいことを入力</strong>
+        普段の言葉で、AIに任せたい内容や条件を短く書きます。
+      </div>
+      <div class="step-card">
+        <strong>2. 前提指示を自動生成</strong>
+        ムダな前置きを省き、的確に動くための初期設定にまとめます。
+      </div>
+      <div class="step-card">
+        <strong>3. 他のAIに貼り付けて使う</strong>
+        新しいチャットの最初にコピー＆ペーストして利用枠を節約します。
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="userInput">AIに何をさせたいですか？（簡単な日本語でOK）</label>
+      <textarea id="userInput" placeholder="例：ビジネスメールを自然な日本語に直したい。堅苦しすぎず簡潔にしてほしい..."></textarea>
+
+      <div class="presets">
+        <button class="preset-btn" onclick="setPreset('レポートや論文の文章を論理的に整えて。意味は変えず簡潔にして')">文章ブラッシュアップ</button>
+        <button class="preset-btn" onclick="setPreset('動くコードをそのまま出して。基礎的な説明や前置きは省いて')">コード作成</button>
+        <button class="preset-btn" onclick="setPreset('長い文章を3つの重要ポイントに要約して。各項目30文字以内')">要点まとめ</button>
+      </div>
+
+      <button id="generateBtn" class="primary-btn" onclick="generatePrompt()">AI事前設定を生成する</button>
+
+      <div id="outputBox" class="output-box">
+        <div class="output-header">
+          <strong>生成結果（コピーして目的のAIに送信）：</strong>
+          <button id="copyBtn" class="copy-btn" onclick="copyResult()">コピー</button>
+        </div>
+        <pre id="resultText"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setPreset(text) {
+      document.getElementById('userInput').value = text;
+    }
+
+    async function generatePrompt() {
+      const input = document.getElementById('userInput').value.trim();
+      if (!input) return alert('内容を入力してください。');
+
+      const btn = document.getElementById('generateBtn');
+      const outputBox = document.getElementById('outputBox');
+      const resultText = document.getElementById('resultText');
+
+      btn.disabled = true;
+      btn.innerText = '設定を生成中...';
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userInput: input })
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || '生成に失敗しました');
+
+        resultText.innerText = data.result;
+        outputBox.style.display = 'block';
+      } catch (err) {
+        alert('エラーが発生しました：' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'AI事前設定を生成する';
+      }
+    }
+
+    function copyResult() {
+      const text = document.getElementById('resultText').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const copyBtn = document.getElementById('copyBtn');
+        copyBtn.innerText = 'コピー完了';
+        setTimeout(() => copyBtn.innerText = 'コピー', 2000);
+      });
+    }
+  </script>
+</body>
+</html>
